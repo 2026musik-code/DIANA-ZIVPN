@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<h2>Dashboard</h2>
+<div class="row mt-4">
+    <div class="col-md-4">
+        <div class="card text-white bg-primary mb-3">
+            <div class="card-header">Total Sales</div>
+            <div class="card-body">
+                <h5 class="card-title">{{ total_sales | default('Rp 0') }}</h5>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-white bg-success mb-3">
+            <div class="card-header">Active Users</div>
+            <div class="card-body">
+                <h5 class="card-title">{{ active_users_count | default('0') }}</h5>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-white bg-info mb-3">
+            <div class="card-header">Total Transactions</div>
+            <div class="card-body">
+                <h5 class="card-title">{{ transaction_count | default('0') }}</h5>
+            </div>
+        </div>
+    </div>
+</div>
+
+<h4 class="mt-4">Recent Transactions</h4>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Ref ID</th>
+            <th>Username</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Date</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for tx in recent_transactions %}
+        <tr>
+            <td>{{ tx['reference_id'] }}</td>
+            <td>{{ tx['username'] }}</td>
+            <td>Rp {{ tx['amount'] }}</td>
+            <td>
+                <span class="badge {% if tx['status'] == 'paid' %}bg-success{% elif tx['status'] == 'pending' %}bg-warning{% else %}bg-danger{% endif %}">
+                    {{ tx['status'] }}
+                </span>
+            </td>
+            <td>{{ tx['created_at'] }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="5" class="text-center">No transactions found.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if package else 'Add' }} Package{% endblock %}
+
+{% block content %}
+<h2>{{ 'Edit' if package else 'Add' }} Package</h2>
+<div class="card mt-4">
+    <div class="card-body">
+        <form method="POST">
+            <div class="mb-3">
+                <label class="form-label">Package Name</label>
+                <input type="text" name="name" class="form-control" value="{{ package['name'] if package else '' }}" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Duration (Days)</label>
+                <input type="number" name="duration" class="form-control" value="{{ package['duration'] if package else '' }}" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Price (IDR)</label>
+                <input type="number" name="price" class="form-control" value="{{ package['price'] if package else '' }}" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Save</button>
+            <a href="{{ url_for('admin_packages') }}" class="btn btn-secondary">Cancel</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

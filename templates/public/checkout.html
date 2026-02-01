@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Checkout{% endblock %}
+
+{% block content_public %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-5 text-center">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4>Scan QRIS to Pay</h4>
+                </div>
+                <div class="card-body">
+                    <p class="lead">Amount: <strong>Rp {{ transaction['amount'] }}</strong></p>
+                    <p>Reference: {{ transaction['reference_id'] }}</p>
+
+                    {% if qr_content %}
+                        <!-- Assuming qr_content is raw string, using a library or simple image gen -->
+                        <!-- In production, generate QR image from string. Here we assume Paymenku might return an image URL or string.
+                             If string, we need a QR generator. For now, we will display the content or a placeholder link. -->
+                        <div class="mb-3">
+                             <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={{ qr_content }}" alt="QRIS Code" class="img-fluid">
+                        </div>
+                        <p class="small text-muted">Scan using GoPay, OVO, Dana, ShopeePay, etc.</p>
+
+                        {% if checkout_url %}
+                        <a href="{{ checkout_url }}" target="_blank" class="btn btn-primary btn-sm mt-2">Open Payment Link</a>
+                        {% endif %}
+                    {% else %}
+                         <div class="alert alert-danger">Error generating QR Code.</div>
+                    {% endif %}
+
+                    <hr>
+                    <p>After payment, your account will be activated automatically.</p>
+                    <a href="{{ url_for('status_page') }}" class="btn btn-outline-secondary">Check Activation Status</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

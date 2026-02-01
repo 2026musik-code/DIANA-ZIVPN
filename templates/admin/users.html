@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Users{% endblock %}
+
+{% block content %}
+<h2>Active Users</h2>
+
+<table class="table table-striped mt-4">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Username</th>
+            <th>Expiry Date</th>
+            <th>Status</th>
+            <th>Created At</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for user in users %}
+        <tr>
+            <td>{{ user['id'] }}</td>
+            <td>{{ user['username'] }}</td>
+            <td>{{ user['expiry_date'] }}</td>
+            <td>
+                <span class="badge {% if user['status'] == 'active' %}bg-success{% else %}bg-secondary{% endif %}">
+                    {{ user['status'] }}
+                </span>
+            </td>
+            <td>{{ user['created_at'] }}</td>
+            <td>
+                {% if user['status'] == 'active' %}
+                <a href="{{ url_for('admin_kill_user', username=user['username']) }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to kill this session? This will disconnect the user.')">
+                    <i class="fas fa-plug"></i> Kill Session
+                </a>
+                {% endif %}
+            </td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="6" class="text-center">No active users found.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

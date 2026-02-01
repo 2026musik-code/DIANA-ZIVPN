@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Order VPN Account{% endblock %}
+
+{% block content_public %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">
+                    <h4>Order Form</h4>
+                </div>
+                <div class="card-body">
+                    <h5>Package: {{ package['name'] }}</h5>
+                    <p>Price: Rp {{ package['price'] }}</p>
+                    <p>Duration: {{ package['duration'] }} Days</p>
+                    <hr>
+                    <form method="POST" action="{{ url_for('checkout') }}">
+                        <input type="hidden" name="package_id" value="{{ package['id'] }}">
+                        <div class="mb-3">
+                            <label class="form-label">Desired Username</label>
+                            <input type="text" name="username" class="form-control" required pattern="[a-zA-Z0-9]+" title="Alphanumeric only">
+                            <small class="text-muted">Only letters and numbers.</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Password</label>
+                            <input type="text" name="password" class="form-control" required>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100">Proceed to Payment</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

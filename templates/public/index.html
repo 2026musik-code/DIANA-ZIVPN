@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}VPN Service Pricing{% endblock %}
+
+{% block content_public %}
+<div class="container mt-5">
+    <div class="text-center mb-5">
+        <h1>Premium VPN Service</h1>
+        <p class="lead">Fast, Secure, and Reliable UDP Zivpn Protocol</p>
+        <a href="{{ url_for('status_page') }}" class="btn btn-outline-primary">Check Account Status</a>
+    </div>
+
+    <div class="row">
+        {% for pkg in packages %}
+        <div class="col-md-4 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header bg-primary text-white text-center">
+                    <h4>{{ pkg['name'] }}</h4>
+                </div>
+                <div class="card-body text-center">
+                    <h1 class="card-title pricing-card-title">Rp {{ pkg['price'] }} <small class="text-muted">/ {{ pkg['duration'] }} Days</small></h1>
+                    <ul class="list-unstyled mt-3 mb-4">
+                        <li>High Speed Server</li>
+                        <li>Unlimited Bandwidth</li>
+                        <li>UDP Zivpn Protocol</li>
+                        <li>99.9% Uptime</li>
+                    </ul>
+                    <a href="{{ url_for('order_page', pkg_id=pkg['id']) }}" class="btn btn-lg btn-block btn-primary w-100">Buy Now</a>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="col-12 text-center">
+            <p>No packages available at the moment.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
