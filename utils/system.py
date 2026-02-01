@@ -1,80 +1,65 @@
-import subprocess
-import os
 import logging
+from utils.zivpn_config import ZivpnConfig
 
 # Set this to False in production
 MOCK_MODE = True
 
 logger = logging.getLogger(__name__)
 
-def run_command(command, input_text=None):
-    """
-    Executes a shell command safely without shell=True.
-    Args:
-        command (list): The command and arguments as a list.
-        input_text (str): Optional input to pipe to stdin.
-    """
-    if MOCK_MODE:
-        logger.info(f"[MOCK SYSTEM] Executing: {command} | Input: {input_text}")
-        return True, "Mock success"
-
-    try:
-        # shell=False is default, which is safer (prevents injection)
-        result = subprocess.run(command, input=input_text, text=True, capture_output=True, check=True)
-        return True, result.stdout
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Command failed: {command}. Error: {e.stderr}")
-        return False, e.stderr
-    except FileNotFoundError:
-        logger.error(f"Command not found: {command[0]}")
-        return False, "Command not found"
-
 def create_user(username, password, expiry_date):
     """
-    Creates a system user for VPN.
+    Creates a VPN user by adding to Zivpn config.
     """
-    expiry_str = expiry_date.strftime('%Y-%m-%d')
-
-    # 1. Create user
-    # useradd -M -s /bin/false -e YYYY-MM-DD username
-    cmd_add = ["useradd", "-M", "-s", "/bin/false", "-e", expiry_str, username]
-    success, msg = run_command(cmd_add)
-    if not success:
-        return False, msg
-
-    # 2. Set password
-    # chpasswd expects "user:password" on stdin
-    cmd_pass = ["chpasswd"]
-    input_pass = f"{username}:{password}"
-    success, msg = run_command(cmd_pass, input_text=input_pass)
-
-    return success, msg
+    try:
+        zivpn = ZivpnConfig()
+        # Add user to config (username:password)
+        if zivpn.add_user(username, password):
+            # Restart service
+            success, msg = zivpn.reload_service()
+            if success:
+                logger.info(f"User {username} created and Zivpn restarted.")
+                return True, "User created successfully"
+            else:
+                logger.error(f"User added to config but service restart failed: {msg}")
+                return False, f"Service restart failed: {msg}"
+        else:
+            return False, "Failed to write config"
+    except Exception as e:
+        logger.error(f"Error creating user: {e}")
+        return False, str(e)
 
 def delete_user(username):
     """
-    Deletes a system user.
+    Deletes a VPN user from Zivpn config.
     """
-    cmd = ["userdel", "-f", username]
-    return run_command(cmd)
+    try:
+        zivpn = ZivpnConfig()
+        if zivpn.remove_user(username):
+            success, msg = zivpn.reload_service()
+            return success, msg
+        return False, "Failed to save config"
+    except Exception as e:
+        return False, str(e)
 
 def kill_user_session(username):
     """
-    Kills the user's connection.
+    Kills user session.
+    For Zivpn, we strictly speaking can't kill a single session easily without API.
+    We will restart the service which disconnects everyone.
     """
-    cmd = ["pkill", "-u", username]
-    return run_command(cmd)
+    # In a real Zivpn setup, maybe removing the user and restarting is the way to kick them.
+    # Since we don't have a separate "disconnect" command, we reuse reload.
+    zivpn = ZivpnConfig()
+    return zivpn.reload_service()
 
 def check_user_exists(username):
     """
-    Checks if a user exists in the system.
+    Checks if a user exists in the Zivpn config.
     """
-    cmd = ["id", username]
-    if MOCK_MODE:
-        logger.info(f"[MOCK SYSTEM] Checking user: {username}")
-        return False # Simulate user does NOT exist so we can create it
-
-    try:
-        subprocess.run(cmd, capture_output=True, check=True)
-        return True
-    except subprocess.CalledProcessError:
-        return False
+    zivpn = ZivpnConfig()
+    # Check if any token starts with "username:"
+    if "auth" in zivpn.data and "config" in zivpn.data["auth"]:
+        for token in zivpn.data["auth"]["config"]:
+            if token.startswith(f"{username}:") or token == username:
+                return True
+    return False
