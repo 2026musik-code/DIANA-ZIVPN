@@ -3,7 +3,10 @@
 {% block title %}Manage Users{% endblock %}
 
 {% block content %}
-<h2>Active Users</h2>
+<div class="d-flex justify-content-between align-items-center">
+    <h2>Active Users</h2>
+    <a href="{{ url_for('admin_add_user') }}" class="btn btn-success"><i class="fas fa-plus"></i> Create User</a>
+</div>
 
 <table class="table table-striped mt-4">
     <thead>

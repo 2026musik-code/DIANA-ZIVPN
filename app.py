@@ -318,6 +318,40 @@ def admin_users():
     conn.close()
     return render_template('admin/users.html', users=users)
 
+@app.route('/admin/users/add', methods=['GET', 'POST'])
+@login_required
+def admin_add_user():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        duration = int(request.form['duration'])
+
+        conn = get_db_connection()
+        # Check if user exists
+        if conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone():
+            flash('Username already exists.', 'danger')
+            conn.close()
+            return redirect(url_for('admin_add_user'))
+
+        # Create System User
+        expiry_date = datetime.datetime.now() + datetime.timedelta(days=duration)
+        success, msg = create_user(username, password, expiry_date)
+
+        if success:
+            conn.execute('''
+                INSERT INTO users (username, password, expiry_date, status)
+                VALUES (?, ?, ?, 'active')
+            ''', (username, password, expiry_date))
+            conn.commit()
+            flash('User created successfully.', 'success')
+            conn.close()
+            return redirect(url_for('admin_users'))
+        else:
+            flash(f'Failed to create user: {msg}', 'danger')
+            conn.close()
+
+    return render_template('admin/add_user.html')
+
 @app.route('/admin/users/kill/<string:username>')
 @login_required
 def admin_kill_user(username):

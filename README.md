@@ -15,6 +15,7 @@ Web Panel Manajemen VPN otomatis untuk protokol **UDP Zivpn**, dibangun dengan P
 - **Manajemen Paket**: CRUD paket harga VPN.
 - **Manajemen User**:
   - List user aktif.
+  - **Create User**: Membuat akun VPN manual (tanpa pembayaran).
   - **Kill Session**: Memutus koneksi user secara paksa (Restart Service).
 - **Pengaturan API**: Konfigurasi Merchant ID dan API Key Paymenku.
 

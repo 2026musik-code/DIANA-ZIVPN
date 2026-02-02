@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Create User{% endblock %}
+
+{% block content %}
+<h2>Create New VPN User</h2>
+<div class="card mt-4">
+    <div class="card-body">
+        <form method="POST">
+            <div class="mb-3">
+                <label class="form-label">Username</label>
+                <input type="text" name="username" class="form-control" required pattern="[a-zA-Z0-9]+" title="Alphanumeric only">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Password</label>
+                <input type="text" name="password" class="form-control" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Duration (Days)</label>
+                <input type="number" name="duration" class="form-control" value="30" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Create User</button>
+            <a href="{{ url_for('admin_users') }}" class="btn btn-secondary">Cancel</a>
+        </form>
+    </div>
+</div>
+{% endblock %}
