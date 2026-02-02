@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,35 +13,49 @@
         .sidebar a { color: rgba(255,255,255,.8); text-decoration: none; display: block; padding: 10px 15px; }
         .sidebar a:hover { color: white; background: rgba(255,255,255,.1); }
         .sidebar .active { background: #4e54c8; color: white; }
+
+        /* Mobile Sidebar adjustments */
+        @media (max-width: 767.98px) {
+            .sidebar { min-height: auto; }
+        }
     </style>
     {% block head %}{% endblock %}
 </head>
 <body>
 
     {% if session.get('admin_logged_in') %}
+
+    <!-- Mobile Navbar -->
+    <nav class="navbar navbar-dark bg-dark d-md-none p-3 mb-3">
+        <span class="navbar-brand">Admin VPN</span>
+        <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </nav>
+
     <div class="container-fluid">
         <div class="row">
-            <div class="col-md-2 sidebar p-0">
+            <!-- Sidebar (Desktop) -->
+            <div class="col-md-2 d-none d-md-block sidebar p-0">
                 <div class="p-3 text-center font-weight-bold border-bottom border-secondary">
-                    <h4>VPN Admin</h4>
+                    <h4>Admin VPN</h4>
                 </div>
-                <a href="{{ url_for('admin_dashboard') }}" class="{% if request.endpoint == 'admin_dashboard' %}active{% endif %}">
-                    <i class="fas fa-tachometer-alt me-2"></i> Dashboard
-                </a>
-                <a href="{{ url_for('admin_packages') }}" class="{% if request.endpoint.startswith('admin_packages') %}active{% endif %}">
-                    <i class="fas fa-box me-2"></i> Packages
-                </a>
-                <a href="{{ url_for('admin_users') }}" class="{% if request.endpoint.startswith('admin_users') %}active{% endif %}">
-                    <i class="fas fa-users me-2"></i> Users
-                </a>
-                <a href="{{ url_for('admin_settings') }}" class="{% if request.endpoint == 'admin_settings' %}active{% endif %}">
-                    <i class="fas fa-cog me-2"></i> Settings
-                </a>
-                <a href="{{ url_for('admin_logout') }}">
-                    <i class="fas fa-sign-out-alt me-2"></i> Logout
-                </a>
+                {% include 'admin/sidebar_links.html' %}
             </div>
-            <div class="col-md-10 p-4">
+
+            <!-- Sidebar (Mobile Offcanvas) -->
+            <div class="offcanvas offcanvas-start bg-dark text-white" tabindex="-1" id="sidebarMenu">
+                <div class="offcanvas-header border-bottom border-secondary">
+                    <h5 class="offcanvas-title">Menu Admin</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+                </div>
+                <div class="offcanvas-body p-0 sidebar">
+                     {% include 'admin/sidebar_links.html' %}
+                </div>
+            </div>
+
+            <!-- Content -->
+            <div class="col-md-10 ms-sm-auto col-lg-10 px-md-4 py-4">
                 {% with messages = get_flashed_messages(with_categories=true) %}
                   {% if messages %}
                     {% for category, message in messages %}

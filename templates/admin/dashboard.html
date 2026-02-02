@@ -4,11 +4,11 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Dashboard</h2>
+    <h2>Dasbor</h2>
     <div>
-        <button class="btn btn-outline-primary me-2" onclick="location.reload()"><i class="fas fa-sync-alt"></i> Refresh</button>
+        <button class="btn btn-outline-primary me-2" onclick="location.reload()"><i class="fas fa-sync-alt"></i> Segarkan</button>
         <form method="POST" action="{{ url_for('admin_update_system') }}" class="d-inline" onsubmit="return confirm('Update system from Git and restart service?')">
-            <button type="submit" class="btn btn-warning"><i class="fas fa-cloud-download-alt"></i> Update System</button>
+            <button type="submit" class="btn btn-warning"><i class="fas fa-cloud-download-alt"></i> Update Sistem</button>
         </form>
     </div>
 </div>
@@ -16,7 +16,7 @@
 <div class="row mt-4">
     <div class="col-md-4">
         <div class="card text-white bg-primary mb-3">
-            <div class="card-header">Total Sales</div>
+            <div class="card-header">Total Penjualan</div>
             <div class="card-body">
                 <h5 class="card-title">{{ total_sales | default('Rp 0') }}</h5>
             </div>
@@ -24,7 +24,7 @@
     </div>
     <div class="col-md-4">
         <div class="card text-white bg-success mb-3">
-            <div class="card-header">Active Users</div>
+            <div class="card-header">Pengguna Aktif</div>
             <div class="card-body">
                 <h5 class="card-title">{{ active_users_count | default('0') }}</h5>
             </div>
@@ -32,7 +32,7 @@
     </div>
     <div class="col-md-4">
         <div class="card text-white bg-info mb-3">
-            <div class="card-header">Total Transactions</div>
+            <div class="card-header">Total Transaksi</div>
             <div class="card-body">
                 <h5 class="card-title">{{ transaction_count | default('0') }}</h5>
             </div>
@@ -40,16 +40,16 @@
     </div>
 </div>
 
-<h4 class="mt-4">Recent Transactions</h4>
+<h4 class="mt-4">Transaksi Terakhir</h4>
 <table class="table table-striped">
     <thead>
         <tr>
-            <th>Ref ID</th>
+            <th>ID Ref</th>
             <th>PIN</th>
             <th>Username</th>
-            <th>Amount</th>
+            <th>Jumlah</th>
             <th>Status</th>
-            <th>Date</th>
+            <th>Tanggal</th>
         </tr>
     </thead>
     <tbody>
@@ -68,7 +68,7 @@
         </tr>
         {% else %}
         <tr>
-            <td colspan="6" class="text-center">No transactions found.</td>
+            <td colspan="6" class="text-center">Tidak ada transaksi ditemukan.</td>
         </tr>
         {% endfor %}
     </tbody>

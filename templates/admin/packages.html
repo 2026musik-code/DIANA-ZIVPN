@@ -1,21 +1,21 @@
 {% extends "base.html" %}
 
-{% block title %}Manage Packages{% endblock %}
+{% block title %}Kelola Paket{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center">
-    <h2>Packages</h2>
-    <a href="{{ url_for('admin_add_package') }}" class="btn btn-primary"><i class="fas fa-plus"></i> Add Package</a>
+    <h2>Paket VPN</h2>
+    <a href="{{ url_for('admin_add_package') }}" class="btn btn-primary"><i class="fas fa-plus"></i> Tambah Paket</a>
 </div>
 
 <table class="table table-striped mt-4">
     <thead>
         <tr>
             <th>ID</th>
-            <th>Name</th>
-            <th>Duration (Days)</th>
-            <th>Price</th>
-            <th>Actions</th>
+            <th>Nama</th>
+            <th>Durasi (Hari)</th>
+            <th>Harga</th>
+            <th>Aksi</th>
         </tr>
     </thead>
     <tbody>
@@ -23,16 +23,16 @@
         <tr>
             <td>{{ pkg['id'] }}</td>
             <td>{{ pkg['name'] }}</td>
-            <td>{{ pkg['duration'] }} Days</td>
+            <td>{{ pkg['duration'] }} Hari</td>
             <td>Rp {{ pkg['price'] }}</td>
             <td>
                 <a href="{{ url_for('admin_edit_package', pkg_id=pkg['id']) }}" class="btn btn-sm btn-warning">Edit</a>
-                <a href="{{ url_for('admin_delete_package', pkg_id=pkg['id']) }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?')">Delete</a>
+                <a href="{{ url_for('admin_delete_package', pkg_id=pkg['id']) }}" class="btn btn-sm btn-danger" onclick="return confirm('Yakin ingin menghapus?')">Hapus</a>
             </td>
         </tr>
         {% else %}
         <tr>
-            <td colspan="5" class="text-center">No packages found.</td>
+            <td colspan="5" class="text-center">Tidak ada paket ditemukan.</td>
         </tr>
         {% endfor %}
     </tbody>

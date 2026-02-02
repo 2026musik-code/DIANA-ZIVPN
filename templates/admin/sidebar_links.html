@@ -1,0 +1,15 @@
+<a href="{{ url_for('admin_dashboard') }}" class="{% if request.endpoint == 'admin_dashboard' %}active{% endif %}">
+    <i class="fas fa-tachometer-alt me-2"></i> Dasbor
+</a>
+<a href="{{ url_for('admin_packages') }}" class="{% if request.endpoint.startswith('admin_packages') %}active{% endif %}">
+    <i class="fas fa-box me-2"></i> Paket
+</a>
+<a href="{{ url_for('admin_users') }}" class="{% if request.endpoint.startswith('admin_users') %}active{% endif %}">
+    <i class="fas fa-users me-2"></i> Pengguna
+</a>
+<a href="{{ url_for('admin_settings') }}" class="{% if request.endpoint == 'admin_settings' %}active{% endif %}">
+    <i class="fas fa-cog me-2"></i> Pengaturan
+</a>
+<a href="{{ url_for('admin_logout') }}">
+    <i class="fas fa-sign-out-alt me-2"></i> Keluar
+</a>
