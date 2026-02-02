@@ -1,0 +1,72 @@
+/* Custom Modern Theme */
+:root {
+    --primary-color: #4e54c8;
+    --secondary-color: #8f94fb;
+    --accent-color: #ff6b6b;
+    --dark-bg: #1a1a2e;
+    --card-bg: #16213e;
+    --text-light: #e94560;
+}
+
+body {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    font-family: 'Poppins', sans-serif;
+    color: #333;
+}
+
+h1, h2, h3, h4, h5 {
+    font-weight: 700;
+}
+
+/* Card Effects */
+.card {
+    border: none;
+    border-radius: 15px;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+}
+
+/* Buttons */
+.btn-primary {
+    background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+    border: none;
+    box-shadow: 0 4px 15px rgba(78, 84, 200, 0.4);
+}
+
+.btn-primary:hover {
+    background: linear-gradient(45deg, var(--secondary-color), var(--primary-color));
+    transform: scale(1.02);
+}
+
+/* Navbar Pills */
+.nav-pills .nav-link.active {
+    background: var(--primary-color);
+    box-shadow: 0 4px 10px rgba(78, 84, 200, 0.3);
+}
+
+.nav-pills .nav-link {
+    color: #555;
+    font-weight: 600;
+}
+
+/* Animations */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 20px, 0);
+    }
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+.animate-fade-up {
+    animation: fadeInUp 0.5s ease-out forwards;
+}

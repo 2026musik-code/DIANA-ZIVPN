@@ -26,17 +26,25 @@
 
     <div class="tab-content" id="pills-tabContent">
         <!-- Store Section -->
-        <div class="tab-pane fade show active" id="pills-store" role="tabpanel">
+        <div class="tab-pane fade show active animate-fade-up" id="pills-store" role="tabpanel">
             <div class="row g-4 justify-content-center">
                 {% for pkg in packages %}
                 <div class="col-md-4">
-                    <div class="card h-100 shadow-sm border-0">
-                        <div class="card-body text-center p-4">
-                            <h5 class="card-title fw-bold text-primary">{{ pkg['name'] }}</h5>
-                            <h2 class="display-6 my-3">Rp {{ "{:,}".format(pkg['price']) }}</h2>
-                            <p class="text-muted mb-4">{{ pkg['duration'] }} Days Active</p>
-                            <button class="btn btn-primary w-100 rounded-pill" onclick="openOrderModal('{{ pkg.id }}', '{{ pkg.name }}', '{{ pkg.price }}')">
-                                Order Now
+                    <div class="card h-100 shadow border-0 text-center">
+                        <div class="card-header bg-transparent border-0 pt-4">
+                            <span class="badge bg-info text-white rounded-pill px-3 py-2 shadow-sm">BEST SELLER</span>
+                        </div>
+                        <div class="card-body p-4">
+                            <h4 class="card-title fw-bold" style="color: var(--primary-color);">{{ pkg['name'] }}</h4>
+                            <h1 class="display-5 fw-bold my-3">Rp {{ "{:,}".format(pkg['price']) }}</h1>
+                            <p class="text-muted mb-4"><i class="fas fa-clock me-2"></i>{{ pkg['duration'] }} Days Active</p>
+                            <ul class="list-unstyled text-start mx-auto" style="max-width: 200px;">
+                                <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>High Speed</li>
+                                <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>UDP Zivpn</li>
+                                <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>No Logs</li>
+                            </ul>
+                            <button class="btn btn-primary w-100 rounded-pill py-2 mt-3" onclick="openOrderModal('{{ pkg.id }}', '{{ pkg.name }}', '{{ pkg.price }}')">
+                                <i class="fas fa-bolt me-2"></i> Order Now
                             </button>
                         </div>
                     </div>
