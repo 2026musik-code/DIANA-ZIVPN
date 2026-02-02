@@ -1,39 +1,218 @@
 {% extends "base.html" %}
 
-{% block title %}VPN Service Pricing{% endblock %}
+{% block title %}VPN Dashboard{% endblock %}
 
 {% block content_public %}
-<div class="container mt-5">
+<div class="container py-5">
+    <!-- Header -->
     <div class="text-center mb-5">
-        <h1>Premium VPN Service</h1>
-        <p class="lead">Fast, Secure, and Reliable UDP Zivpn Protocol</p>
-        <a href="{{ url_for('status_page') }}" class="btn btn-outline-primary">Check Account Status</a>
+        <h1 class="display-4 fw-bold">Premium VPN Service</h1>
+        <p class="lead text-muted">High Speed, Secure, & Reliable UDP Zivpn</p>
     </div>
 
-    <div class="row">
-        {% for pkg in packages %}
-        <div class="col-md-4 mb-4">
-            <div class="card shadow h-100">
-                <div class="card-header bg-primary text-white text-center">
-                    <h4>{{ pkg['name'] }}</h4>
+    <!-- Navigation Tabs -->
+    <ul class="nav nav-pills justify-content-center mb-4" id="pills-tab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active rounded-pill px-4" id="pills-store-tab" data-bs-toggle="pill" data-bs-target="#pills-store" type="button" role="tab">
+                <i class="fas fa-shopping-cart me-2"></i> Beli VPN
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-pill px-4" id="pills-account-tab" data-bs-toggle="pill" data-bs-target="#pills-account" type="button" role="tab">
+                <i class="fas fa-user-shield me-2"></i> User Akun
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="pills-tabContent">
+        <!-- Store Section -->
+        <div class="tab-pane fade show active" id="pills-store" role="tabpanel">
+            <div class="row g-4 justify-content-center">
+                {% for pkg in packages %}
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm border-0">
+                        <div class="card-body text-center p-4">
+                            <h5 class="card-title fw-bold text-primary">{{ pkg['name'] }}</h5>
+                            <h2 class="display-6 my-3">Rp {{ "{:,}".format(pkg['price']) }}</h2>
+                            <p class="text-muted mb-4">{{ pkg['duration'] }} Days Active</p>
+                            <button class="btn btn-primary w-100 rounded-pill" onclick="openOrderModal('{{ pkg.id }}', '{{ pkg.name }}', '{{ pkg.price }}')">
+                                Order Now
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div class="card-body text-center">
-                    <h1 class="card-title pricing-card-title">Rp {{ pkg['price'] }} <small class="text-muted">/ {{ pkg['duration'] }} Days</small></h1>
-                    <ul class="list-unstyled mt-3 mb-4">
-                        <li>High Speed Server</li>
-                        <li>Unlimited Bandwidth</li>
-                        <li>UDP Zivpn Protocol</li>
-                        <li>99.9% Uptime</li>
-                    </ul>
-                    <a href="{{ url_for('order_page', pkg_id=pkg['id']) }}" class="btn btn-lg btn-block btn-primary w-100">Buy Now</a>
+                {% else %}
+                <div class="text-center text-muted">No packages available.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Account Section (PIN) -->
+        <div class="tab-pane fade" id="pills-account" role="tabpanel">
+            <div class="row justify-content-center">
+                <div class="col-md-6">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-body p-4">
+                            <h4 class="text-center mb-4">Cek Akun VPN</h4>
+                            <div class="mb-3">
+                                <label class="form-label">Masukkan PIN Transaksi</label>
+                                <input type="text" id="checkPinInput" class="form-control text-center fs-4" placeholder="123456" maxlength="6">
+                            </div>
+                            <button class="btn btn-info text-white w-100 rounded-pill mb-3" onclick="checkOrder()">
+                                Cek Akun
+                            </button>
+
+                            <!-- Result Area -->
+                            <div id="accountResult" class="d-none mt-4">
+                                <div class="alert alert-secondary">
+                                    <div class="d-flex justify-content-between">
+                                        <strong>Status:</strong>
+                                        <span id="resStatus" class="badge bg-warning">PENDING</span>
+                                    </div>
+                                    <hr>
+                                    <p class="mb-1"><strong>Username:</strong> <span id="resUser">user</span></p>
+                                    <p class="mb-1"><strong>Package:</strong> <span id="resPkg">Pack</span></p>
+
+                                    <div id="resPaid" class="d-none mt-3 p-3 bg-white rounded border">
+                                        <p class="mb-1 text-success fw-bold">Active Credentials:</p>
+                                        <p class="mb-1">Password: <code id="resPass" class="fs-5">***</code></p>
+                                        <p class="mb-0 small text-muted">Expires: <span id="resExp">-</span></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-        {% else %}
-        <div class="col-12 text-center">
-            <p>No packages available at the moment.</p>
-        </div>
-        {% endfor %}
     </div>
 </div>
+
+<!-- Order Modal -->
+<div class="modal fade" id="orderModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title">Order VPN</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div id="orderForm">
+                    <h6 class="text-primary mb-3" id="modalPkgName">Package Name</h6>
+                    <div class="mb-3">
+                        <label class="form-label">Username</label>
+                        <input type="text" id="orderUser" class="form-control" placeholder="Enter username">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Password</label>
+                        <input type="text" id="orderPass" class="form-control" placeholder="Enter password">
+                    </div>
+                    <button class="btn btn-success w-100" onclick="submitOrder()">Lanjut Pembayaran</button>
+                </div>
+
+                <!-- QR Result -->
+                <div id="orderResult" class="d-none text-center">
+                    <div class="alert alert-success mb-3">
+                        <strong>PIN ANDA:</strong>
+                        <h1 class="display-4 fw-bold text-dark" id="resPin">000000</h1>
+                        <small>Simpan PIN ini untuk melihat akun Anda!</small>
+                    </div>
+                    <p>Scan QRIS berikut:</p>
+                    <div id="qrImage" class="mb-3"></div> <!-- Image injected here -->
+                    <p class="fw-bold fs-4 text-danger" id="resAmount">Rp 0</p>
+                    <a href="#" id="payLink" target="_blank" class="btn btn-sm btn-outline-primary mb-3">Buka Link Pembayaran</a>
+                    <hr>
+                    <button class="btn btn-secondary w-100" data-bs-dismiss="modal">Tutup</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let selectedPkgId = null;
+
+function openOrderModal(id, name, price) {
+    selectedPkgId = id;
+    document.getElementById('modalPkgName').innerText = name + ' - Rp ' + price;
+    document.getElementById('orderForm').classList.remove('d-none');
+    document.getElementById('orderResult').classList.add('d-none');
+    var modal = new bootstrap.Modal(document.getElementById('orderModal'));
+    modal.show();
+}
+
+function submitOrder() {
+    const user = document.getElementById('orderUser').value;
+    const pass = document.getElementById('orderPass').value;
+
+    if(!user || !pass) {
+        alert("Username & Password wajib diisi!");
+        return;
+    }
+
+    fetch('/api/create_order', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            package_id: selectedPkgId,
+            username: user,
+            password: pass
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if(data.success) {
+            document.getElementById('orderForm').classList.add('d-none');
+            document.getElementById('orderResult').classList.remove('d-none');
+
+            document.getElementById('resPin').innerText = data.pin;
+            document.getElementById('resAmount').innerText = 'Rp ' + data.amount;
+
+            // Generate QR Image (using API or assuming raw content needs rendering)
+            // If data.qr_content is a string, we might need a library like qrcode.js or use an API
+            // Using goqr.me API for simplicity in frontend rendering
+            document.getElementById('qrImage').innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(data.qr_content)}" class="img-fluid border p-2">`;
+
+            document.getElementById('payLink').href = data.checkout_url;
+        } else {
+            alert(data.message);
+        }
+    })
+    .catch(e => alert("Error: " + e));
+}
+
+function checkOrder() {
+    const pin = document.getElementById('checkPinInput').value;
+    if(!pin) return;
+
+    fetch('/api/check_order', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({pin: pin})
+    })
+    .then(r => r.json())
+    .then(data => {
+        const resDiv = document.getElementById('accountResult');
+        resDiv.classList.remove('d-none');
+
+        if(data.found) {
+            document.getElementById('resStatus').innerText = data.status.toUpperCase();
+            document.getElementById('resStatus').className = 'badge ' + (data.status === 'paid' ? 'bg-success' : 'bg-warning');
+
+            document.getElementById('resUser').innerText = data.username;
+            document.getElementById('resPkg').innerText = data.package;
+
+            if(data.status === 'paid') {
+                document.getElementById('resPaid').classList.remove('d-none');
+                document.getElementById('resPass').innerText = data.password;
+                document.getElementById('resExp').innerText = data.expiry_date || 'Active';
+            } else {
+                document.getElementById('resPaid').classList.add('d-none');
+            }
+        } else {
+            resDiv.innerHTML = '<div class="alert alert-danger">PIN Tidak Ditemukan!</div>';
+        }
+    });
+}
+</script>
 {% endblock %}

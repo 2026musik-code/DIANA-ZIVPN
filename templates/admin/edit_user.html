@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Edit User{% endblock %}
+
+{% block content %}
+<h2>Edit User: {{ user['username'] }}</h2>
+<div class="card mt-4">
+    <div class="card-body">
+        <form method="POST">
+            <div class="mb-3">
+                <label class="form-label">Update Password (Optional)</label>
+                <input type="text" name="password" class="form-control" placeholder="Leave blank to keep current">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Extend Duration (Days)</label>
+                <input type="number" name="extend_days" class="form-control" placeholder="0">
+                <small class="text-muted">Enter number of days to add to current expiry.</small>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Current Expiry</label>
+                <input type="text" class="form-control" value="{{ user['expiry_date'] }}" readonly>
+            </div>
+            <button type="submit" class="btn btn-primary">Update User</button>
+            <a href="{{ url_for('admin_users') }}" class="btn btn-secondary">Cancel</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

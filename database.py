@@ -21,7 +21,7 @@ def init_db():
         )
     ''')
 
-    # Settings Table (Key-Value pair for config like API keys)
+    # Settings Table
     c.execute('''
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
@@ -51,11 +51,12 @@ def init_db():
         )
     ''')
 
-    # Transactions Table
+    # Transactions Table (Added 'pin')
     c.execute('''
         CREATE TABLE IF NOT EXISTS transactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             reference_id TEXT NOT NULL UNIQUE,
+            pin TEXT NOT NULL,
             username TEXT NOT NULL,
             password TEXT NOT NULL,
             package_id INTEGER,

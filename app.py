@@ -1,13 +1,16 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, g
+from flask import Flask, render_template, request, redirect, url_for, flash, session, g, jsonify
 from config import Config
 from database import get_db_connection
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 import functools
 import uuid
 import datetime
 import logging
+import random
+import string
+import subprocess
 from utils.paymenku import PaymenkuClient
-from utils.system import create_user, check_user_exists, kill_user_session
+from utils.system import create_user, check_user_exists, kill_user_session, delete_user
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -33,6 +36,172 @@ def close_connection(exception):
     db = getattr(g, '_database', None)
     if db is not None:
         db.close()
+
+# --- Public Routes (One Page) ---
+
+@app.route('/')
+def index():
+    conn = get_db_connection()
+    packages = conn.execute('SELECT * FROM packages').fetchall()
+    conn.close()
+    return render_template('public/index.html', packages=packages)
+
+@app.route('/api/create_order', methods=['POST'])
+def create_order():
+    """
+    AJAX Endpoint to create order and return QR + PIN
+    """
+    data = request.json
+    package_id = data.get('package_id')
+    username = data.get('username')
+    password = data.get('password')
+
+    conn = get_db_connection()
+    package = conn.execute('SELECT * FROM packages WHERE id = ?', (package_id,)).fetchone()
+
+    if not package:
+        conn.close()
+        return jsonify({'success': False, 'message': 'Package not found'}), 404
+
+    # Check Username
+    existing_user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+    if existing_user or check_user_exists(username):
+        conn.close()
+        return jsonify({'success': False, 'message': 'Username already exists'}), 400
+
+    # Payment Config
+    merchant_id_row = conn.execute("SELECT value FROM settings WHERE key='merchant_id'").fetchone()
+    api_key_row = conn.execute("SELECT value FROM settings WHERE key='api_key'").fetchone()
+
+    if not merchant_id_row or not api_key_row:
+        conn.close()
+        return jsonify({'success': False, 'message': 'Payment gateway not configured'}), 500
+
+    merchant_id = merchant_id_row['value']
+    api_key = api_key_row['value']
+
+    # Generate Data
+    ref_id = f"TRX-{uuid.uuid4().hex[:8].upper()}"
+    pin = ''.join(random.choices(string.digits, k=6)) # 6 Digit PIN
+    amount = package['price']
+
+    # Save Pending Transaction
+    conn.execute('''
+        INSERT INTO transactions (reference_id, pin, username, password, package_id, amount, status)
+        VALUES (?, ?, ?, ?, ?, ?, 'pending')
+    ''', (ref_id, pin, username, password, package_id, amount))
+    conn.commit()
+    conn.close()
+
+    # Call Paymenku
+    client = PaymenkuClient(merchant_id, api_key, Config.PAYMENKU_BASE_URL)
+    resp = client.create_transaction(ref_id, amount)
+
+    if resp.get('success', True) and 'data' in resp:
+        return jsonify({
+            'success': True,
+            'pin': pin,
+            'amount': amount,
+            'reference_id': ref_id,
+            'qr_content': resp['data'].get('qr_content'),
+            'checkout_url': resp['data'].get('checkout_url')
+        })
+    else:
+        return jsonify({'success': False, 'message': resp.get('message', 'Payment Error')}), 500
+
+@app.route('/api/check_order', methods=['POST'])
+def check_order():
+    """
+    Check order status by PIN
+    """
+    pin = request.json.get('pin')
+    conn = get_db_connection()
+    # Find all transactions for this PIN (usually one, but pin could technically collide or be reused? No, randomly generated. Assume 1:1 for now or list all)
+    # Actually, user might buy multiple times with different PINs.
+    # But if they want to see "List User yg sudah dibeli" using A PIN?
+    # The requirement: "Diberikan PIN untuk melihat akun".
+    # So PIN is specific to that purchase.
+
+    trx = conn.execute('''
+        SELECT t.*, p.name as package_name, p.duration
+        FROM transactions t
+        JOIN packages p ON t.package_id = p.id
+        WHERE t.pin = ?
+    ''', (pin,)).fetchone()
+
+    conn.close()
+
+    if trx:
+        data = {
+            'found': True,
+            'reference_id': trx['reference_id'],
+            'status': trx['status'],
+            'amount': trx['amount'],
+            'username': trx['username'],
+            'package': trx['package_name']
+        }
+        if trx['status'] == 'paid':
+            data['password'] = trx['password']
+            # Calculate expiry based on created_at + duration (Approximation, real expiry is in users table)
+            # Better: fetch from users table if active
+            conn = get_db_connection()
+            user = conn.execute("SELECT * FROM users WHERE username = ?", (trx['username'],)).fetchone()
+            conn.close()
+            if user:
+                data['expiry_date'] = user['expiry_date']
+                data['user_status'] = user['status']
+
+        return jsonify(data)
+    else:
+        return jsonify({'found': False, 'message': 'PIN not found'})
+
+@app.route('/api/callback', methods=['POST'])
+def callback():
+    data = request.json
+    logger.info(f"Webhook received: {data}")
+
+    conn = get_db_connection()
+    merchant_id_row = conn.execute("SELECT value FROM settings WHERE key='merchant_id'").fetchone()
+    api_key_row = conn.execute("SELECT value FROM settings WHERE key='api_key'").fetchone()
+
+    if not merchant_id_row or not api_key_row:
+        conn.close()
+        return {"success": False, "message": "Config missing"}, 500
+
+    client = PaymenkuClient(merchant_id_row['value'], api_key_row['value'], Config.PAYMENKU_BASE_URL)
+
+    if not client.verify_callback_signature(data):
+        logger.warning("Invalid signature in webhook")
+        if merchant_id_row['value'] != 'mock':
+             conn.close()
+             return {"success": False, "message": "Invalid signature"}, 400
+
+    ref_id = data.get('ref_id')
+    status = data.get('status')
+
+    if status.lower() in ['paid', 'success']:
+        trx = conn.execute('SELECT * FROM transactions WHERE reference_id = ?', (ref_id,)).fetchone()
+
+        if trx and trx['status'] == 'pending':
+            conn.execute("UPDATE transactions SET status = 'paid' WHERE id = ?", (trx['id'],))
+            pkg = conn.execute('SELECT * FROM packages WHERE id = ?', (trx['package_id'],)).fetchone()
+            duration = pkg['duration']
+            expiry_date = datetime.datetime.now() + datetime.timedelta(days=duration)
+
+            success, msg = create_user(trx['username'], trx['password'], expiry_date)
+
+            if success:
+                conn.execute('''
+                    INSERT INTO users (username, password, expiry_date, status)
+                    VALUES (?, ?, ?, 'active')
+                ''', (trx['username'], trx['password'], expiry_date))
+                conn.commit()
+                logger.info(f"User {trx['username']} created successfully.")
+            else:
+                logger.error(f"Failed to create system user: {msg}")
+
+    conn.close()
+    return {"success": True}
 
 # --- Admin Routes ---
 
@@ -64,17 +233,11 @@ def admin_logout():
 @login_required
 def admin_dashboard():
     conn = get_db_connection()
-
-    # Stats
     total_sales_res = conn.execute("SELECT SUM(amount) as total FROM transactions WHERE status='paid'").fetchone()
     total_sales = total_sales_res['total'] if total_sales_res['total'] else 0
-
     active_users_count = conn.execute("SELECT COUNT(*) as count FROM users WHERE status='active'").fetchone()['count']
     transaction_count = conn.execute("SELECT COUNT(*) as count FROM transactions").fetchone()['count']
-
-    # Recent Transactions
     recent_transactions = conn.execute("SELECT * FROM transactions ORDER BY created_at DESC LIMIT 5").fetchall()
-
     conn.close()
 
     return render_template('admin/dashboard.html',
@@ -90,7 +253,6 @@ def admin_settings():
     if request.method == 'POST':
         merchant_id = request.form['merchant_id']
         api_key = request.form['api_key']
-
         conn.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ('merchant_id', merchant_id))
         conn.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ('api_key', api_key))
         conn.commit()
@@ -99,10 +261,39 @@ def admin_settings():
     merchant_id_row = conn.execute("SELECT value FROM settings WHERE key='merchant_id'").fetchone()
     api_key_row = conn.execute("SELECT value FROM settings WHERE key='api_key'").fetchone()
     conn.close()
-
     return render_template('admin/settings.html',
                            merchant_id=merchant_id_row['value'] if merchant_id_row else '',
                            api_key=api_key_row['value'] if api_key_row else '')
+
+@app.route('/admin/change_password', methods=['GET', 'POST'])
+@login_required
+def admin_change_password():
+    if request.method == 'POST':
+        new_password = request.form['new_password']
+        if new_password:
+            hashed = generate_password_hash(new_password)
+            conn = get_db_connection()
+            conn.execute('UPDATE admins SET password_hash = ? WHERE username = ?', (hashed, session['admin_username']))
+            conn.commit()
+            conn.close()
+            flash('Password updated successfully.', 'success')
+        return redirect(url_for('admin_settings'))
+    return redirect(url_for('admin_settings'))
+
+@app.route('/admin/update_system', methods=['POST'])
+@login_required
+def admin_update_system():
+    # Only works if running with sufficient permissions and inside git repo
+    try:
+        # git pull
+        subprocess.run(['git', 'pull'], check=True)
+        # restart service (assumes systemd service name is known, e.g. diana-zivpn)
+        # Requires sudoers or root. Since we run as root in this context:
+        subprocess.run(['systemctl', 'restart', 'diana-zivpn'], check=True)
+        flash('System updated and restarted.', 'success')
+    except Exception as e:
+        flash(f'Update failed: {e}', 'danger')
+    return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/packages')
 @login_required
@@ -112,155 +303,6 @@ def admin_packages():
     conn.close()
     return render_template('admin/packages.html', packages=packages)
 
-# --- Public Routes ---
-
-@app.route('/')
-def index():
-    conn = get_db_connection()
-    packages = conn.execute('SELECT * FROM packages').fetchall()
-    conn.close()
-    return render_template('public/index.html', packages=packages)
-
-@app.route('/order/<int:pkg_id>')
-def order_page(pkg_id):
-    conn = get_db_connection()
-    package = conn.execute('SELECT * FROM packages WHERE id = ?', (pkg_id,)).fetchone()
-    conn.close()
-    if not package:
-        flash('Package not found.', 'danger')
-        return redirect(url_for('index'))
-    return render_template('public/order.html', package=package)
-
-@app.route('/status', methods=['GET', 'POST'])
-def status_page():
-    result = None
-    error = None
-    if request.method == 'POST':
-        username = request.form['username']
-        conn = get_db_connection()
-        user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
-        conn.close()
-
-        if user:
-            result = user
-        else:
-            error = "User not found."
-
-    return render_template('public/status.html', result=result, error=error)
-
-@app.route('/checkout', methods=['POST'])
-def checkout():
-    package_id = request.form['package_id']
-    username = request.form['username']
-    password = request.form['password']
-
-    conn = get_db_connection()
-    package = conn.execute('SELECT * FROM packages WHERE id = ?', (package_id,)).fetchone()
-
-    # Check if username exists in DB or System
-    existing_user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
-    if existing_user or check_user_exists(username):
-        conn.close()
-        flash('Username already exists. Please choose another.', 'danger')
-        return redirect(url_for('order_page', pkg_id=package_id))
-
-    # Get Payment Settings
-    merchant_id_row = conn.execute("SELECT value FROM settings WHERE key='merchant_id'").fetchone()
-    api_key_row = conn.execute("SELECT value FROM settings WHERE key='api_key'").fetchone()
-
-    if not merchant_id_row or not api_key_row:
-        conn.close()
-        flash('Payment gateway not configured by admin.', 'danger')
-        return redirect(url_for('index'))
-
-    merchant_id = merchant_id_row['value']
-    api_key = api_key_row['value']
-
-    # Create Transaction Reference
-    ref_id = f"TRX-{uuid.uuid4().hex[:8].upper()}"
-    amount = package['price']
-
-    conn.execute('''
-        INSERT INTO transactions (reference_id, username, password, package_id, amount, status)
-        VALUES (?, ?, ?, ?, ?, 'pending')
-    ''', (ref_id, username, password, package_id, amount))
-    conn.commit()
-    conn.close()
-
-    # Call Paymenku
-    client = PaymenkuClient(merchant_id, api_key, Config.PAYMENKU_BASE_URL)
-    resp = client.create_transaction(ref_id, amount)
-
-    if resp.get('success', True) and 'data' in resp: # Handling mock response structure or real one
-        qr_content = resp['data'].get('qr_content')
-        checkout_url = resp['data'].get('checkout_url')
-        return render_template('public/checkout.html',
-                               transaction={'amount': amount, 'reference_id': ref_id},
-                               qr_content=qr_content,
-                               checkout_url=checkout_url)
-    else:
-        flash(f"Payment Error: {resp.get('message')}", 'danger')
-        return redirect(url_for('order_page', pkg_id=package_id))
-
-@app.route('/api/callback', methods=['POST'])
-def callback():
-    data = request.json
-    logger.info(f"Webhook received: {data}")
-
-    conn = get_db_connection()
-    merchant_id_row = conn.execute("SELECT value FROM settings WHERE key='merchant_id'").fetchone()
-    api_key_row = conn.execute("SELECT value FROM settings WHERE key='api_key'").fetchone()
-
-    if not merchant_id_row or not api_key_row:
-        conn.close()
-        return {"success": False, "message": "Config missing"}, 500
-
-    client = PaymenkuClient(merchant_id_row['value'], api_key_row['value'], Config.PAYMENKU_BASE_URL)
-
-    # Verify Signature
-    # Note: If running a mock without signature, you might want to bypass this or ensure mock sends valid signature
-    if not client.verify_callback_signature(data):
-        logger.warning("Invalid signature in webhook")
-        # For simplicity in this demo, if it's a mock merchant, we might be lenient or ensure test sends correct sig
-        if merchant_id_row['value'] != 'mock':
-             conn.close()
-             return {"success": False, "message": "Invalid signature"}, 400
-
-    ref_id = data.get('ref_id')
-    status = data.get('status') # e.g. 'Paid', 'Success'
-
-    if status.lower() in ['paid', 'success']:
-        trx = conn.execute('SELECT * FROM transactions WHERE reference_id = ?', (ref_id,)).fetchone()
-
-        if trx and trx['status'] == 'pending':
-            # Update Transaction
-            conn.execute("UPDATE transactions SET status = 'paid' WHERE id = ?", (trx['id'],))
-
-            # Get Package Duration
-            pkg = conn.execute('SELECT * FROM packages WHERE id = ?', (trx['package_id'],)).fetchone()
-            duration = pkg['duration']
-
-            # Calculate Expiry
-            expiry_date = datetime.datetime.now() + datetime.timedelta(days=duration)
-
-            # Create System User
-            success, msg = create_user(trx['username'], trx['password'], expiry_date)
-
-            if success:
-                # Add to Users Table
-                conn.execute('''
-                    INSERT INTO users (username, password, expiry_date, status)
-                    VALUES (?, ?, ?, 'active')
-                ''', (trx['username'], trx['password'], expiry_date))
-                conn.commit()
-                logger.info(f"User {trx['username']} created successfully.")
-            else:
-                logger.error(f"Failed to create system user: {msg}")
-                # We might want to mark transaction as 'failed_provision' or similar
-
-    conn.close()
-    return {"success": True}
-
 @app.route('/admin/packages/add', methods=['GET', 'POST'])
 @login_required
 def admin_add_package():
@@ -268,15 +310,12 @@ def admin_add_package():
         name = request.form['name']
         duration = request.form['duration']
         price = request.form['price']
-
         conn = get_db_connection()
-        conn.execute('INSERT INTO packages (name, duration, price) VALUES (?, ?, ?)',
-                     (name, duration, price))
+        conn.execute('INSERT INTO packages (name, duration, price) VALUES (?, ?, ?)', (name, duration, price))
         conn.commit()
         conn.close()
         flash('Package added successfully.', 'success')
         return redirect(url_for('admin_packages'))
-
     return render_template('admin/package_form.html', package=None)
 
 @app.route('/admin/packages/edit/<int:pkg_id>', methods=['GET', 'POST'])
@@ -284,19 +323,15 @@ def admin_add_package():
 def admin_edit_package(pkg_id):
     conn = get_db_connection()
     package = conn.execute('SELECT * FROM packages WHERE id = ?', (pkg_id,)).fetchone()
-
     if request.method == 'POST':
         name = request.form['name']
         duration = request.form['duration']
         price = request.form['price']
-
-        conn.execute('UPDATE packages SET name = ?, duration = ?, price = ? WHERE id = ?',
-                     (name, duration, price, pkg_id))
+        conn.execute('UPDATE packages SET name = ?, duration = ?, price = ? WHERE id = ?', (name, duration, price, pkg_id))
         conn.commit()
         conn.close()
         flash('Package updated successfully.', 'success')
         return redirect(url_for('admin_packages'))
-
     conn.close()
     return render_template('admin/package_form.html', package=package)
 
@@ -327,13 +362,11 @@ def admin_add_user():
         duration = int(request.form['duration'])
 
         conn = get_db_connection()
-        # Check if user exists
         if conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone():
             flash('Username already exists.', 'danger')
             conn.close()
             return redirect(url_for('admin_add_user'))
 
-        # Create System User
         expiry_date = datetime.datetime.now() + datetime.timedelta(days=duration)
         success, msg = create_user(username, password, expiry_date)
 
@@ -349,27 +382,69 @@ def admin_add_user():
         else:
             flash(f'Failed to create user: {msg}', 'danger')
             conn.close()
-
     return render_template('admin/add_user.html')
+
+@app.route('/admin/users/edit/<int:user_id>', methods=['GET', 'POST'])
+@login_required
+def admin_edit_user(user_id):
+    conn = get_db_connection()
+    user = conn.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone()
+
+    if request.method == 'POST':
+        # Typically we just edit password or duration (expiry)
+        # Editing username is complex (needs system user rename), keeping it simple for now (Password & Expiry)
+        new_password = request.form.get('password')
+        extend_days = request.form.get('extend_days', type=int)
+
+        # Update System
+        current_expiry = datetime.datetime.strptime(user['expiry_date'], '%Y-%m-%d %H:%M:%S.%f') if isinstance(user['expiry_date'], str) else user['expiry_date']
+
+        if extend_days:
+            current_expiry += datetime.timedelta(days=extend_days)
+
+        # Re-create user (update password/expiry in zivpn config)
+        # Zivpn config just holds username:password. It doesn't enforce expiry natively (cron job does).
+        # So we update password in config.
+        if new_password:
+             create_user(user['username'], new_password, current_expiry)
+             conn.execute('UPDATE users SET password = ? WHERE id = ?', (new_password, user_id))
+
+        if extend_days:
+             conn.execute('UPDATE users SET expiry_date = ? WHERE id = ?', (current_expiry, user_id))
+             # Also ensure expiry in system user logic if applicable (in Zivpn mode, it's just DB + Cron)
+
+        conn.commit()
+        conn.close()
+        flash('User updated successfully.', 'success')
+        return redirect(url_for('admin_users'))
+
+    conn.close()
+    return render_template('admin/edit_user.html', user=user)
+
+@app.route('/admin/users/delete/<string:username>')
+@login_required
+def admin_delete_user(username):
+    conn = get_db_connection()
+    user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+
+    if user:
+         delete_user(username) # Remove from Zivpn
+         conn.execute('DELETE FROM users WHERE username = ?', (username,))
+         conn.commit()
+         flash('User deleted.', 'success')
+    else:
+        flash('User not found.', 'danger')
+    conn.close()
+    return redirect(url_for('admin_users'))
 
 @app.route('/admin/users/kill/<string:username>')
 @login_required
 def admin_kill_user(username):
-    # Security check: ensure user actually exists in DB before attempting command
-    conn = get_db_connection()
-    user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
-    conn.close()
-
-    if not user:
-        flash('User not found.', 'danger')
-        return redirect(url_for('admin_users'))
-
     success, msg = kill_user_session(username)
     if success:
         flash(f'Session for {username} killed successfully.', 'success')
     else:
         flash(f'Failed to kill session: {msg}', 'danger')
-
     return redirect(url_for('admin_users'))
 
 if __name__ == '__main__':

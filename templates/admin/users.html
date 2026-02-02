@@ -32,11 +32,17 @@
             </td>
             <td>{{ user['created_at'] }}</td>
             <td>
+                <a href="{{ url_for('admin_edit_user', user_id=user['id']) }}" class="btn btn-sm btn-warning">
+                    <i class="fas fa-edit"></i> Edit
+                </a>
                 {% if user['status'] == 'active' %}
                 <a href="{{ url_for('admin_kill_user', username=user['username']) }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to kill this session? This will disconnect the user.')">
-                    <i class="fas fa-plug"></i> Kill Session
+                    <i class="fas fa-plug"></i> Kill
                 </a>
                 {% endif %}
+                <a href="{{ url_for('admin_delete_user', username=user['username']) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete user permanently?')">
+                    <i class="fas fa-trash"></i>
+                </a>
             </td>
         </tr>
         {% else %}
